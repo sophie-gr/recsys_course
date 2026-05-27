@@ -56,8 +56,9 @@ def top_n_recommend(
     movie_stats.columns = ['avg_rating', 'rating_count']
     
     # Фильтруем фильмы с rating_count >= min_ratings
-    filtered = movie_stats[movie_stats['rating_count'] >= min_ratings]
-    
+    filtered = movie_stats[
+        movie_stats['rating_count'] >= min_ratings
+    ]    
     # Сортируем по avg_rating и rating_count по убыванию
     sorted_movies = filtered.sort_values(['avg_rating', 'rating_count'], ascending=False)
     
@@ -96,9 +97,14 @@ def evaluate_rec_systems(
     popular_recs_set = {rec[0] for rec in popular_recs_list}  # Берём movieId из кортежа
     
     # Считаем Accuracy (доля рекомендованных фильмов, которые пользователь уже смотрел)
-    random_accuracy = len(random_recs_set & user_history_set) / len(random_recs_set) if len(random_recs_set) > 0 else 0
-    popular_accuracy = len(popular_recs_set & user_history_set) / len(popular_recs_set) if len(popular_recs_set) > 0 else 0
-    
+    random_accuracy = (
+        len(random_recs_set & user_history_set) / len(random_recs_set)
+        if len(random_recs_set) > 0 else 0
+    )
+    popular_accuracy = (
+        len(popular_recs_set & user_history_set) / len(popular_recs_set)
+        if len(popular_recs_set) > 0 else 0
+    )
     return {
         'random_accuracy': random_accuracy,
         'popular_accuracy': popular_accuracy
