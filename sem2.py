@@ -116,33 +116,48 @@ def predict_items_for_user(
     Рекомендует фильмы пользователю на основе
     top-r похожих пользователей.
     """
-    # Схожесть с другими
+    # Схожесть с другими пользователями
     similarities = user_user_matrix[user_id].copy()
     similarities[user_id] = -1
     
-    # Топ-r похожих
+    # Топ-r похожих пользователей
     top_r_indices = np.argsort(similarities)[-r:]
     
-    # Средние рейтинги соседей
-    neighbors_ratings = user_item_matrix[top_r_indices]
-    mean_ratings = np.mean(neighbors_ratings, axis=0)
-    
-    # Фильтры
-    high_mean = mean_ratings >= 4.0
-    user_rated = user_item_matrix[user_id] > 0
-    
-    # Кандидаты
-    candidates = np.where(high_mean & ~user_rated)[0]
-    
-    if len(candidates) == 0:
+    if len(top_r_indices) == 0:
         return []
     
-    # Сортировка по рейтингу
-    candidate_scores = mean_ratings[candidates]
-    sorted_idx = np.argsort(candidate_scores)[::-1]
-    sorted_candidates = candidates[sorted_idx]
+    # Собираем все фильмы, которые соседи оценили >= 4.0
+    candidate_movies = {}
     
-    return sorted_candidates[:k].tolist()
+    for neighbor_id in top_r_indices:
+        neighbor_ratings = user_item_matrix[neighbor_id]
+        # Находим фильмы с оценкой >= 4.0
+        high_rated = np.where(neighbor_ratings >= 4.0)[0]
+        
+        for movie_id in high_rated:
+            # Пропускаем фильмы, которые пользователь уже оценил
+            if user_item_matrix[user_id, movie_id] > 0:
+                continue
+            # Добавляем в кандидаты
+            if movie_id not in candidate_movies:
+                candidate_movies[movie_id] = []
+            candidate_movies[movie_id].append(neighbor_ratings[movie_id])
+    
+    if len(candidate_movies) == 0:
+        return []
+    
+    # Считаем средний рейтинг для каждого кандидата
+    movie_scores = []
+    for movie_id, ratings in candidate_movies.items():
+        avg_rating = np.mean(ratings)
+        # Убеждаемся, что movie_id - это int
+        movie_scores.append((int(movie_id), float(avg_rating)))
+    
+    # Сортируем по убыванию среднего рейтинга
+    movie_scores.sort(key=lambda x: x[1], reverse=True)
+    
+    # Возвращаем топ-k, убеждаясь что все элементы - int
+    return [int(movie_id) for movie_id, _ in movie_scores[:k]]
 
 if __name__ == "__main__":
     # Загрузка данных
