@@ -60,8 +60,10 @@ def top_n_recommend(
         movie_stats['rating_count'] >= min_ratings
     ]    
     # Сортируем по avg_rating и rating_count по убыванию
-    sorted_movies = filtered.sort_values(['avg_rating', 'rating_count'], ascending=False)
-    
+    sorted_movies = filtered.sort_values(
+        ['avg_rating', 'rating_count'], 
+        ascending=False
+    )
     # Берём top-n
     top_movies = sorted_movies.head(n_recommendations)
     
