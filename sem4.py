@@ -12,30 +12,6 @@ def singular_value_decomposition(X: np.array, k: int) -> tuple:
     """
     Разложение матрицы рейтингов X на U, S, V (SVD) и возвращение
     первых k компонент.
-
-    Алгоритм:
-    1) Считаем полное сингулярное разложение:
-        X = U_full @ diag(S_full) @ V_full
-       где U_full.shape = (n_users, n_features),
-             S_full.shape = (n_features,),
-             V_full.shape = (n_features, n_items)
-
-    2) Сокращаем до первых k латентных факторов:
-        U_k = U_full[:, :k]
-        S_k = S_full[:k]
-        V_k = V_full[:k, :]
-
-    3) Такое сокращение гарантирует низкоранговое приближение
-       X_hat = U_k @ diag(S_k) @ V_k.
-
-    Args:
-        X: матрица пользователь-фильм (n_users, n_items)
-        k: количество латентных факторов, которое сохранится
-
-    Returns:
-        U_k: (n_users, k)
-        S_k: (k,), сингулярные значения
-        V_k: (k, n_items)
     """
     if not isinstance(X, np.ndarray):
         raise ValueError("X must be a numpy array")
@@ -53,9 +29,6 @@ def singular_value_decomposition(X: np.array, k: int) -> tuple:
 class SVDRecommender:
     """
     Класс для построения рекомендаций на основе матричной факторизации.
-    При инициализации строится матрица пользователь-фильм и считается
-    полное SVD-разложение, после чего для любого k можно быстро получать
-    низкоранговое приближение матрицы рейтингов.
     """
 
     def __init__(self):
@@ -67,41 +40,68 @@ class SVDRecommender:
 
     def _build_factorization(self):
         max_rank = min(self.ui_matrix.shape)
-        self.U, self.S, self.V = singular_value_decomposition(self.ui_matrix, k=max_rank)
+        self.U, self.S, self.V = singular_value_decomposition(
+            self.ui_matrix, k=max_rank
+        )
 
     def _reconstruct_matrix(self, k: int) -> np.ndarray:
+        """Восстанавливает матрицу рейтингов с первыми k компонентами"""
         if k <= 0:
             raise ValueError("k must be positive")
-
-        raise NotImplementedError("Реализуйте восстановление матрицы")
+        
+        # Берем первые k компонент
+        U_k = self.U[:, :k]
+        S_k = self.S[:k]
+        V_k = self.V[:k, :]
+        
+        # Восстанавливаем матрицу: X_hat = U_k @ diag(S_k) @ V_k
+        X_hat = U_k @ np.diag(S_k) @ V_k
+        
+        return X_hat
 
     def predict_rating(self, user_id: int, item_id: int, k: int = 20) -> float:
         """
         Предсказывает рейтинг user_id по фильму item_id методом низкорангового
         приближения SVD.
-
-        Алгоритм:
-        1) Берём матрицу user-item, построенную при инициализации класса.
-        2) Оставляем первые k латентных факторов и восстанавливаем X_hat.
-        3) Предсказание для пары (user_id, item_id) берём из X_hat.
-        4) Обрезаем результат в диапазон [0.0, 5.0].
         """
-        raise NotImplementedError("Реализуйте предсказание рейтинга")
+        # Восстанавливаем матрицу с k компонентами
+        X_hat = self._reconstruct_matrix(k)
+        
+        # Берем предсказание для нужного пользователя и фильма
+        predicted = X_hat[user_id, item_id]
+        
+        # Обрезаем результат в диапазон [0.0, 5.0]
+        return np.clip(predicted, 0.0, 5.0)
 
     def predict_items_for_user(
         self, user_id: int, k: int = 20, n_recommendations: int = 5
     ) -> list:
         """
         Рекомендует фильмы для пользователя user_id по SVD.
-
-        Алгоритм:
-        1) Восстанавливаем приближённую матрицу рейтингов X_hat.
-        2) Берём прогнозы для заданного пользователя.
-        3) Исключаем фильмы, уже оценённые пользователем.
-        4) Сортируем кандидатов по убыванию прогнозного рейтинга.
-        5) Возвращаем top-n индексы фильмов.
         """
-        raise NotImplementedError("Реализуйте рекомендацию фильмов")
+        # Восстанавливаем матрицу с k компонентами
+        X_hat = self._reconstruct_matrix(k)
+        
+        # Прогнозы для пользователя
+        user_predictions = X_hat[user_id]
+        
+        # Находим фильмы, которые пользователь уже оценил
+        user_rated = self.ui_matrix[user_id] > 0
+        
+        # Исключаем оцененные фильмы
+        candidates = np.where(~user_rated)[0]
+        
+        if len(candidates) == 0:
+            return []
+        
+        # Берем прогнозы для кандидатов
+        candidate_scores = user_predictions[candidates]
+        
+        # Сортируем по убыванию
+        sorted_indices = np.argsort(candidate_scores)[::-1]
+        top_candidates = candidates[sorted_indices[:n_recommendations]]
+        
+        return top_candidates.tolist()
 
 
 if __name__ == "__main__":
